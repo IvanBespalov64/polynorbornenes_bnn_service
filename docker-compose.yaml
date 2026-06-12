@@ -1,0 +1,8 @@
+services:
+    app:
+      build:
+          context: .
+          dockerfile: backend/Dockerfile
+      command: uvicorn app:app --host 0.0.0.0 --port 13789
+      ports:
+        - "13789:13789"
