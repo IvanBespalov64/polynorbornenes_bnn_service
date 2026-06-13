@@ -5,5 +5,5 @@ WORKDIR /app
 COPY extra_requirements.txt /app
 RUN pip install -r /app/extra_requirements.txt
 
-COPY backend/ /app/
-COPY data/ /app/
+COPY backend/ /app/backend
+COPY data/ /app/data
