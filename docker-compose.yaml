@@ -1,9 +1,31 @@
 services:
-    app:
-      build:
-          context: .
-          dockerfile: backend/Dockerfile
-      command: uvicorn backend.app:app --host 0.0.0.0 --port 13789
-      restart: unless-stopped
-      ports:
-        - "13789:13789"
+  wireguard-client:
+    image: lscr.io/linuxserver/wireguard:latest
+    container_name: wireguard-client
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./wireguard-config:/config/wg_confs
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wg", "show"]
+      interval: 10s
+      timeout: 5s
+      retries: 5   
+  app:
+    build:
+        context: .
+        dockerfile: backend/Dockerfile
+    command: uvicorn backend.app:app --host 0.0.0.0 --port 13789
+    restart: unless-stopped
+    network_mode: "service:wireguard-client"
+    depends_on:
+      wireguard-client:
+        condition: service_healthy

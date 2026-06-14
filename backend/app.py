@@ -2,6 +2,7 @@ import json
 import typing
 import pathlib
 import pydantic
+import random
 
 import numpy as np
 
@@ -36,7 +37,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace "*" with your actual frontend URL
+    allow_origins=["digimatter.ru"],  # In production, replace "*" with your actual frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -56,6 +57,12 @@ generator = rdFingerprintGenerator.GetMorganGenerator(
     fpSize=1024, 
 )
 
+def seed_everything(seed: int = 42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
 model = MTLBNNRegressor(
     task_names=prediction_metadata.keys(),
     input_dim=1024,
@@ -73,10 +80,20 @@ def predict(
     request : PredictionRequest
 ) -> PredictionRespone:
 
-    if Chem.MolFromSmiles(request.smiles) is None:
+    seed_everything(42)
+
+    print(f"Got request f{request.model_dump()}")
+
+    smiles = request.smiles
+
+    if "|" in smiles:
+        smiles = smiles[:smiles.find('|')].strip()
+        print(f"Find pipe in SMILES, fixed to {smiles}")
+
+    if Chem.MolFromSmiles(smiles) is None:
         raise HTTPException(status_code=400, detail="Invalid SMILES!")
 
-    fps = generator.GetCountFingerprintAsNumPy(Chem.MolFromSmiles(request.smiles))
+    fps = generator.GetCountFingerprintAsNumPy(Chem.MolFromSmiles(smiles))
     cur_x = torch.tensor(fps, dtype=torch.float32).view(1, -1)
     
     preds = {task : [] for task in prediction_metadata.keys()}
