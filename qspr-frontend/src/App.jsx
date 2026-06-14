@@ -30,7 +30,7 @@ export default function App() {
       }
       
       // 2. Call the FastAPI backend
-      const response = await fetch('http://localhost:13789/predict', {
+      const response = await fetch('api/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ smiles })
@@ -106,8 +106,8 @@ export default function App() {
               <thead>
                 <tr style={{ backgroundColor: '#ecf0f1' }}>
                   <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #bdc3c7' }}>Gas</th>
-                  <th style={{ padding: '12px', textAlign: 'right', borderBottom: '2px solid #bdc3c7' }}>Mean</th>
-                  <th style={{ padding: '12px', textAlign: 'right', borderBottom: '2px solid #bdc3c7' }}>Std Dev</th>
+                  <th style={{ padding: '12px', textAlign: 'right', borderBottom: '2px solid #bdc3c7' }}>Mean, Barrer</th>
+                  <th style={{ padding: '12px', textAlign: 'right', borderBottom: '2px solid #bdc3c7' }}>Std Dev, Barrer</th>
                 </tr>
               </thead>
               <tbody>
