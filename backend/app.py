@@ -21,7 +21,7 @@ class PredictionRequest(pydantic.BaseModel):
 
 class SinglePrediction(pydantic.BaseModel):
     mean : float = pydantic.Field(...)
-    std : float = pydantic.Field(...)
+    confidence : float = pydantic.Field(...)
 
 class PredictionRespone(pydantic.BaseModel):
     p_n2 : SinglePrediction
@@ -29,9 +29,7 @@ class PredictionRespone(pydantic.BaseModel):
     p_h2 : SinglePrediction
     p_o2 : SinglePrediction
     p_ch4 : SinglePrediction
-    p_c2h6 : SinglePrediction
-    p_c3h8 : SinglePrediction
-    p_c4h10 : SinglePrediction
+    p_co2 : SinglePrediction
 
 app = FastAPI()
 
@@ -44,7 +42,7 @@ app.add_middleware(
 )
 
 prediction_metadata_path = (pathlib.Path(__file__) / '..' / '..' / 'data' / 'prediction_metadata.json').resolve()
-model_checkpoint_path = (pathlib.Path(__file__) / '..' / '..' / 'data' / 'bnn_mtl_on_full_data.pt').resolve()
+model_checkpoint_path = (pathlib.Path(__file__) / '..' / '..' / 'data' / 'bnn_on_full_data_revised.pt').resolve()
 
 NUM_PRED_SAMPLES : int = 100
 
@@ -97,7 +95,7 @@ def predict(
     cur_x = torch.tensor(fps, dtype=torch.float32).view(1, -1)
     
     preds = {task : [] for task in prediction_metadata.keys()}
-    preds_mean, preds_std = {}, {}
+    preds_mean, preds_confidence = {}, {}
     with torch.inference_mode():
         for task in prediction_metadata.keys():
             for _ in range(NUM_PRED_SAMPLES):
@@ -105,46 +103,34 @@ def predict(
                     model(cur_x, task, sample=True).item()
                 )
             preds_mean[task] = np.mean(preds[task]) * prediction_metadata[task]['target_std'] + prediction_metadata[task]['target_mean']
-            preds_std[task] = np.std(preds[task]) * prediction_metadata[task]['target_std'] + prediction_metadata[task]['target_mean']
+            preds_confidence[task] = np.std(preds[task]) * prediction_metadata[task]['target_std'] + prediction_metadata[task]['target_mean']
 
-            preds_std[task] = max(0, np.sqrt(preds_std[task]**2 - prediction_metadata[task]['target_min_pred_std']**2))
-
-            # anti box-cox
-            preds_std[task] = np.exp(preds_std[task]) - 1
-            preds_mean[task] = np.exp(preds_mean[task]) - 1
+            preds_confidence[task] = np.clip(1 - np.log(preds_confidence[task] / prediction_metadata[task]['target_median_pred_std']) / np.log(2), 0, 1) 
 
     return PredictionRespone(
         p_n2=SinglePrediction(
             mean=preds_mean['inhs_p(n2)'],
-            std=preds_std['inhs_p(n2)'],
+            std=preds_confidence['inhs_p(n2)'],
         ),
         p_he=SinglePrediction(
             mean=preds_mean['inhs_p(he)'],
-            std=preds_std['inhs_p(he)'],
+            std=preds_confidence['inhs_p(he)'],
         ),
         p_h2=SinglePrediction(
             mean=preds_mean['inhs_p(h2)'],
-            std=preds_std['inhs_p(h2)'],
+            std=preds_confidence['inhs_p(h2)'],
         ),
         p_o2=SinglePrediction(
             mean=preds_mean['inhs_p(o2)'],
-            std=preds_std['inhs_p(o2)'],
+            std=preds_confidence['inhs_p(o2)'],
         ),
         p_ch4=SinglePrediction(
             mean=preds_mean['inhs_p(ch4)'],
-            std=preds_std['inhs_p(ch4)'],
+            std=preds_confidence['inhs_p(ch4)'],
         ),
-        p_c2h6=SinglePrediction(
-            mean=preds_mean['inhs_p(c2h6)'],
-            std=preds_std['inhs_p(c2h6)'],
-        ),
-        p_c3h8=SinglePrediction(
-            mean=preds_mean['inhs_p(c3h8)'],
-            std=preds_std['inhs_p(c3h8)'],
-        ),
-        p_c4h10=SinglePrediction(
-            mean=preds_mean['inhs_p(c4h10)'],
-            std=preds_std['inhs_p(c4h10)'],
+        p_co2=SinglePrediction(
+            mean=preds_mean['inhs_p(co2)'],
+            std=preds_confidence['inhs_p(co2)'],
         ),
     )
 
